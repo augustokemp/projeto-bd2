@@ -1,0 +1,2783 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 14.5 (Ubuntu 14.5-1ubuntu1)
+-- Dumped by pg_dump version 14.5 (Ubuntu 14.5-1ubuntu1)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: atualizanomemembro(integer, character varying); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.atualizanomemembro(a_membro_pk integer, a_nome character varying) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+
+BEGIN
+	UPDATE
+		membro
+	SET
+		nome = a_nome
+	WHERE
+		membro_pk = a_membro_pk;
+END;
+$$;
+
+
+ALTER FUNCTION public.atualizanomemembro(a_membro_pk integer, a_nome character varying) OWNER TO postgres;
+
+--
+-- Name: atualizapagamento(integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.atualizapagamento(a_membro_pk integer, a_mensalidade_pk integer) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+
+BEGIN
+	IF EXISTS(
+		SELECT
+			*
+		FROM 
+			pagamento_mensalidade pm 
+		WHERE 
+			pm.membro_fk = a_membro_pk
+		AND
+			pm.mensalidade_fk = a_mensalidade_pk
+	) THEN
+		UPDATE
+			pagamento_mensalidade 
+		SET 
+			pago = TRUE
+		WHERE 
+			membro_fk = a_membro_pk 
+		AND
+			mensalidade_fk = a_mensalidade_pk;
+	ELSE
+		INSERT INTO
+			pagamento_mensalidade (membro_fk, mensalidade_fk, pago)
+		VALUES
+			(a_membro_pk, a_mensalidade_pk, TRUE);
+	END IF;
+END;
+$$;
+
+
+ALTER FUNCTION public.atualizapagamento(a_membro_pk integer, a_mensalidade_pk integer) OWNER TO postgres;
+
+--
+-- Name: quantidademembrosparticiparamfesta(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.quantidademembrosparticiparamfesta() RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+
+DECLARE result INTEGER ;
+
+BEGIN
+	result := (
+		SELECT 
+			COUNT(pe.*)
+		FROM 
+			participacao_evento pe 
+		JOIN 
+			evento e ON e.evento_pk = pe.evento_fk 
+		WHERE 
+			pe.status = 1
+		AND 
+			e.tipo = 'Festa'
+	);
+RETURN result ;
+END;
+$$;
+
+
+ALTER FUNCTION public.quantidademembrosparticiparamfesta() OWNER TO postgres;
+
+--
+-- Name: quantidademembrosparticiparamfesta(character varying); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.quantidademembrosparticiparamfesta(a_tipo_evento character varying) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+
+DECLARE result INTEGER ;
+
+BEGIN
+	result := (
+		SELECT 
+			COUNT(pe.*)
+		FROM 
+			participacao_evento pe 
+		JOIN 
+			evento e ON e.evento_pk = pe.evento_fk 
+		WHERE 
+			pe.status = 1
+		AND 
+			e.tipo = a_tipo_evento
+	);
+RETURN result ;
+END;
+$$;
+
+
+ALTER FUNCTION public.quantidademembrosparticiparamfesta(a_tipo_evento character varying) OWNER TO postgres;
+
+--
+-- Name: registramembro(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.registramembro() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+
+DECLARE
+	mensalidade_fk INTEGER;
+	membro_fk INTEGER;
+
+BEGIN
+	mensalidade_fk := (SELECT m.mensalidade_pk FROM mensalidade m ORDER BY m."data" DESC LIMIT 1);
+	membro_fk := NEW.membro_pk;
+
+	INSERT INTO
+		pagamento_mensalidade (membro_fk, mensalidade_fk, pago)
+	VALUES
+		(membro_fk, mensalidade_fk, FALSE);
+
+	RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.registramembro() OWNER TO postgres;
+
+--
+-- Name: totalmensalidadesnaopagas(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.totalmensalidadesnaopagas() RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+
+DECLARE result INTEGER ;
+
+BEGIN
+	result := (
+		SELECT
+			SUM(m.valor)
+		FROM
+			pagamento_mensalidade pm 
+		JOIN 
+			mensalidade m ON m.mensalidade_pk = pm.mensalidade_fk 
+		WHERE 
+			pm.pago IS FALSE 
+	);
+RETURN result ;
+END;
+$$;
+
+
+ALTER FUNCTION public.totalmensalidadesnaopagas() OWNER TO postgres;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: clube; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.clube (
+    clube_pk integer NOT NULL,
+    nome character varying
+);
+
+
+ALTER TABLE public.clube OWNER TO postgres;
+
+--
+-- Name: clube_clube_pk_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.clube_clube_pk_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.clube_clube_pk_seq OWNER TO postgres;
+
+--
+-- Name: clube_clube_pk_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.clube_clube_pk_seq OWNED BY public.clube.clube_pk;
+
+
+--
+-- Name: clube_evento; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.clube_evento (
+    clube_fk integer NOT NULL,
+    evento_fk integer NOT NULL
+);
+
+
+ALTER TABLE public.clube_evento OWNER TO postgres;
+
+--
+-- Name: clube_evento_clube_fk_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.clube_evento_clube_fk_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.clube_evento_clube_fk_seq OWNER TO postgres;
+
+--
+-- Name: clube_evento_clube_fk_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.clube_evento_clube_fk_seq OWNED BY public.clube_evento.clube_fk;
+
+
+--
+-- Name: clube_evento_evento_fk_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.clube_evento_evento_fk_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.clube_evento_evento_fk_seq OWNER TO postgres;
+
+--
+-- Name: clube_evento_evento_fk_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.clube_evento_evento_fk_seq OWNED BY public.clube_evento.evento_fk;
+
+
+--
+-- Name: clube_membro; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.clube_membro (
+    membro_fk integer NOT NULL,
+    clube_fk integer NOT NULL,
+    cargo character varying
+);
+
+
+ALTER TABLE public.clube_membro OWNER TO postgres;
+
+--
+-- Name: evento; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.evento (
+    evento_pk integer NOT NULL,
+    data_inicio timestamp without time zone,
+    data_fim timestamp without time zone,
+    tipo character varying,
+    localizacao character varying
+);
+
+
+ALTER TABLE public.evento OWNER TO postgres;
+
+--
+-- Name: evento_evento_pk_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.evento_evento_pk_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.evento_evento_pk_seq OWNER TO postgres;
+
+--
+-- Name: evento_evento_pk_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.evento_evento_pk_seq OWNED BY public.evento.evento_pk;
+
+
+--
+-- Name: participacao_evento; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.participacao_evento (
+    evento_fk integer NOT NULL,
+    membro_fk integer NOT NULL,
+    status integer
+);
+
+
+ALTER TABLE public.participacao_evento OWNER TO postgres;
+
+--
+-- Name: eventosmaiorparticipacao; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.eventosmaiorparticipacao AS
+ SELECT e.tipo,
+    count((pe.status = 1)) AS count
+   FROM (public.evento e
+     JOIN public.participacao_evento pe ON ((pe.evento_fk = e.evento_pk)))
+  GROUP BY e.tipo
+  ORDER BY (count((pe.status = 1))) DESC;
+
+
+ALTER TABLE public.eventosmaiorparticipacao OWNER TO postgres;
+
+--
+-- Name: membro; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.membro (
+    membro_pk integer NOT NULL,
+    nome character varying,
+    cpf character varying,
+    data_nasc date,
+    fone character varying,
+    email character varying
+);
+
+
+ALTER TABLE public.membro OWNER TO postgres;
+
+--
+-- Name: membro_membro_pk_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.membro_membro_pk_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.membro_membro_pk_seq OWNER TO postgres;
+
+--
+-- Name: membro_membro_pk_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.membro_membro_pk_seq OWNED BY public.membro.membro_pk;
+
+
+--
+-- Name: membro_motocicleta; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.membro_motocicleta (
+    membro_fk integer NOT NULL,
+    motocicleta_fk integer NOT NULL
+);
+
+
+ALTER TABLE public.membro_motocicleta OWNER TO postgres;
+
+--
+-- Name: membrosmenospagadores; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.membrosmenospagadores AS
+SELECT
+    NULL::integer AS membro_pk,
+    NULL::character varying AS nome,
+    NULL::numeric AS total;
+
+
+ALTER TABLE public.membrosmenospagadores OWNER TO postgres;
+
+--
+-- Name: mensalidade; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.mensalidade (
+    mensalidade_pk integer NOT NULL,
+    data date,
+    valor numeric,
+    vencimento date
+);
+
+
+ALTER TABLE public.mensalidade OWNER TO postgres;
+
+--
+-- Name: mensalidade_mensalidade_pk_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.mensalidade_mensalidade_pk_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.mensalidade_mensalidade_pk_seq OWNER TO postgres;
+
+--
+-- Name: mensalidade_mensalidade_pk_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.mensalidade_mensalidade_pk_seq OWNED BY public.mensalidade.mensalidade_pk;
+
+
+--
+-- Name: motocicleta; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.motocicleta (
+    motocicleta_pk integer NOT NULL,
+    marca character varying,
+    modelo character varying,
+    ano integer,
+    cilindrada integer,
+    cor character varying,
+    final_placa integer
+);
+
+
+ALTER TABLE public.motocicleta OWNER TO postgres;
+
+--
+-- Name: motocicleta_motocicleta_pk_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.motocicleta_motocicleta_pk_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.motocicleta_motocicleta_pk_seq OWNER TO postgres;
+
+--
+-- Name: motocicleta_motocicleta_pk_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.motocicleta_motocicleta_pk_seq OWNED BY public.motocicleta.motocicleta_pk;
+
+
+--
+-- Name: pagamento_mensalidade; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.pagamento_mensalidade (
+    membro_fk integer NOT NULL,
+    mensalidade_fk integer NOT NULL,
+    pago boolean
+);
+
+
+ALTER TABLE public.pagamento_mensalidade OWNER TO postgres;
+
+--
+-- Name: participacao_evento_evento_fk_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.participacao_evento_evento_fk_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.participacao_evento_evento_fk_seq OWNER TO postgres;
+
+--
+-- Name: participacao_evento_evento_fk_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.participacao_evento_evento_fk_seq OWNED BY public.participacao_evento.evento_fk;
+
+
+--
+-- Name: participacao_evento_membro_fk_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.participacao_evento_membro_fk_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.participacao_evento_membro_fk_seq OWNER TO postgres;
+
+--
+-- Name: participacao_evento_membro_fk_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.participacao_evento_membro_fk_seq OWNED BY public.participacao_evento.membro_fk;
+
+
+--
+-- Name: clube clube_pk; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.clube ALTER COLUMN clube_pk SET DEFAULT nextval('public.clube_clube_pk_seq'::regclass);
+
+
+--
+-- Name: clube_evento clube_fk; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.clube_evento ALTER COLUMN clube_fk SET DEFAULT nextval('public.clube_evento_clube_fk_seq'::regclass);
+
+
+--
+-- Name: clube_evento evento_fk; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.clube_evento ALTER COLUMN evento_fk SET DEFAULT nextval('public.clube_evento_evento_fk_seq'::regclass);
+
+
+--
+-- Name: evento evento_pk; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.evento ALTER COLUMN evento_pk SET DEFAULT nextval('public.evento_evento_pk_seq'::regclass);
+
+
+--
+-- Name: membro membro_pk; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.membro ALTER COLUMN membro_pk SET DEFAULT nextval('public.membro_membro_pk_seq'::regclass);
+
+
+--
+-- Name: mensalidade mensalidade_pk; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.mensalidade ALTER COLUMN mensalidade_pk SET DEFAULT nextval('public.mensalidade_mensalidade_pk_seq'::regclass);
+
+
+--
+-- Name: motocicleta motocicleta_pk; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.motocicleta ALTER COLUMN motocicleta_pk SET DEFAULT nextval('public.motocicleta_motocicleta_pk_seq'::regclass);
+
+
+--
+-- Name: participacao_evento evento_fk; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.participacao_evento ALTER COLUMN evento_fk SET DEFAULT nextval('public.participacao_evento_evento_fk_seq'::regclass);
+
+
+--
+-- Name: participacao_evento membro_fk; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.participacao_evento ALTER COLUMN membro_fk SET DEFAULT nextval('public.participacao_evento_membro_fk_seq'::regclass);
+
+
+--
+-- Data for Name: clube; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.clube (clube_pk, nome) FROM stdin;
+1	NAJA Moto Clube
+2	ABUTRES Moto Clube
+3	INSANOS Moto Clube
+\.
+
+
+--
+-- Data for Name: clube_evento; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.clube_evento (clube_fk, evento_fk) FROM stdin;
+2	1
+2	2
+3	3
+3	4
+1	5
+1	6
+1	7
+2	8
+3	9
+3	10
+3	11
+3	12
+3	13
+2	14
+2	15
+1	16
+2	17
+3	18
+1	19
+3	20
+3	21
+1	22
+3	23
+3	24
+1	25
+3	26
+3	27
+1	28
+2	29
+1	30
+\.
+
+
+--
+-- Data for Name: clube_membro; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.clube_membro (membro_fk, clube_fk, cargo) FROM stdin;
+1	1	Membro
+2	1	Membro
+3	1	Membro
+4	3	Diretor
+5	1	Supervisor
+6	2	Tesoureiro
+7	3	Tesoureiro
+8	2	Membro
+9	2	Membro
+10	1	Supervisor
+11	1	Membro
+12	3	Membro
+13	1	Membro
+14	3	Presidente
+15	3	Membro
+16	1	Membro
+17	1	Membro
+18	1	Membro
+19	3	Tesoureiro
+20	3	Tesoureiro
+21	1	Membro
+22	1	Membro
+23	1	Tesoureiro
+24	2	Membro
+25	1	Membro
+26	1	Tesoureiro
+27	1	Membro
+28	1	Membro
+29	1	Tesoureiro
+30	3	Diretor
+31	2	Diretor
+32	2	Diretor
+33	1	Presidente
+34	2	Presidente
+35	1	Membro
+36	1	Diretor
+37	2	Membro
+38	2	Membro
+39	1	Diretor
+40	1	Tesoureiro
+41	3	Membro
+42	1	Supervisor
+43	3	Tesoureiro
+44	1	Membro
+45	1	Supervisor
+46	1	Diretor
+47	3	Membro
+48	2	Diretor
+49	1	Membro
+50	3	Diretor
+\.
+
+
+--
+-- Data for Name: evento; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.evento (evento_pk, data_inicio, data_fim, tipo, localizacao) FROM stdin;
+1	2022-02-16 08:43:32	2022-02-20 08:43:32	Festa	Balneário Camboriú
+2	2022-10-10 22:08:26	2022-10-14 22:08:26	Confraternização	Balneário Camboriú
+3	2023-01-18 00:10:52	2023-01-22 00:10:52	Outro	Itajaí
+4	2023-01-18 10:16:22	2023-01-21 10:16:22	Festa	Balneário Camboriú
+5	2022-07-20 05:09:41	2022-07-22 05:09:41	Outro	Itajaí
+6	2022-05-19 13:43:19	2022-05-23 13:43:19	Festa	Balneário Camboriú
+7	2022-05-31 07:25:04	2022-06-04 07:25:04	Outro	Blumenau
+8	2022-12-31 02:32:39	2023-01-05 02:32:39	Festa	Tijucas
+9	2022-04-18 18:06:10	2022-04-21 18:06:10	Outro	Balneário Camboriú
+10	2023-01-27 00:24:35	2023-01-28 00:24:35	Confraternização	Balneário Camboriú
+11	2022-12-02 23:29:12	2022-12-07 23:29:12	Festa	Tijucas
+12	2022-03-26 05:05:15	2022-03-27 05:05:15	Outro	Itajaí
+13	2022-04-26 05:04:19	2022-04-30 05:04:19	Outro	Navegantes
+14	2022-03-01 07:24:31	2022-03-04 07:24:31	Festa	Penha
+15	2022-04-06 02:11:04	2022-04-08 02:11:04	Festa	Balneário Camboriú
+16	2022-06-02 17:16:02	2022-06-05 17:16:02	Confraternização	Navegantes
+17	2022-07-07 21:03:31	2022-07-09 21:03:31	Confraternização	Itajaí
+18	2022-04-05 13:46:15	2022-04-10 13:46:15	Festa	Navegantes
+19	2022-06-14 08:12:26	2022-06-15 08:12:26	Outro	Navegantes
+20	2022-04-25 01:31:09	2022-04-29 01:31:09	Festa	Balneário Camboriú
+21	2022-08-14 13:26:46	2022-08-18 13:26:46	Outro	Penha
+22	2022-01-10 09:50:12	2022-01-12 09:50:12	Confraternização	Itajaí
+23	2022-07-24 21:55:19	2022-07-27 21:55:19	Confraternização	Penha
+24	2022-09-22 04:18:45	2022-09-26 04:18:45	Outro	Balneário Camboriú
+25	2022-10-04 22:57:15	2022-10-06 22:57:15	Confraternização	Penha
+26	2022-09-12 18:38:44	2022-09-16 18:38:44	Confraternização	Itajaí
+27	2022-04-20 07:41:59	2022-04-24 07:41:59	Confraternização	Florianópolis
+28	2022-03-21 18:38:29	2022-03-24 18:38:29	Festa	Florianópolis
+29	2023-01-15 23:25:21	2023-01-19 23:25:21	Confraternização	Balneário Camboriú
+30	2022-08-10 13:40:23	2022-08-11 13:40:23	Confraternização	Florianópolis
+\.
+
+
+--
+-- Data for Name: membro; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.membro (membro_pk, nome, cpf, data_nasc, fone, email) FROM stdin;
+1	Sonny Boland	71117436655	1982-07-12	49939065471	sboland0@linkedin.com
+2	Charles Derington	59259326022	2002-03-29	48578672960	cderington1@technorati.com
+4	Efren Skeggs	38883518330	1994-04-23	49655209568	eskeggs3@myspace.com
+5	Karlens Rockall	53404053482	2000-11-02	49577889123	krockall4@gmpg.org
+6	Sandro McCurt	27975304140	1986-08-26	48710247339	smccurt5@intel.com
+7	Maury Kneeland	39736254945	1999-05-10	49995346570	mkneeland6@cyberchimps.com
+8	Catrina O'Kennavain	97909292840	1995-01-05	49757908188	cokennavain7@aboutads.info
+9	Millie Boylan	48690345497	1981-02-12	48872976978	mboylan8@ucoz.ru
+10	Bobby Dotterill	83626473688	1984-11-27	48005053717	bdotterill9@wired.com
+11	Bernardine Duffet	35103550921	1984-08-14	48646686712	bduffeta@a8.net
+12	Jelene Heugh	39065678644	1993-04-13	49881590675	jheughb@list-manage.com
+13	Bear Pethick	23114077671	1996-12-09	48183585621	bpethickc@clickbank.net
+14	Quentin Rossborough	50193193431	1986-07-28	48061693171	qrossboroughd@123-reg.co.uk
+15	Gardy Campa	11285217776	1983-11-27	48938065479	gcampae@marriott.com
+16	Darius Askem	61138223635	1984-07-16	49159320845	daskemf@seesaa.net
+17	Brewer Cristoferi	61861075559	1983-05-16	47960663544	bcristoferig@upenn.edu
+18	Urson Seel	62246382266	1997-11-22	49172684119	useelh@google.com.hk
+19	Bran Pyner	59761112958	1990-07-20	49596517236	bpyneri@vistaprint.com
+20	Bentley MacCallion	54223588534	1996-02-06	49351034851	bmaccallionj@census.gov
+21	Ange Julian	48310736619	1995-03-21	49002322534	ajuliank@bandcamp.com
+22	Cleve Tadman	58277160672	1998-04-01	48816133206	ctadmanl@t.co
+23	Midge Gillise	19938848645	2000-12-15	49267491256	mgillisem@xrea.com
+24	Jermaine Srawley	72799215359	1993-05-13	48883646534	jsrawleyn@dedecms.com
+25	Marguerite Egle	83288159798	2002-01-31	48442930609	megleo@businesswire.com
+26	Sisely Hembry	71417241376	1994-12-30	49383798129	shembryp@123-reg.co.uk
+27	Sherilyn Merigeau	44006020639	2000-09-21	48108412684	smerigeauq@microsoft.com
+28	Dulcia Morriarty	42488742509	1995-05-08	48066168123	dmorriartyr@netvibes.com
+29	Redford Dexter	49071606283	1987-10-21	49073468507	rdexters@google.fr
+30	Massimiliano McAne	91514020021	1989-10-07	48676052778	mmcanet@tamu.edu
+31	Fransisco Camfield	16626029764	2001-03-29	48809633731	fcamfieldu@comsenz.com
+32	Bridget Maciejewski	94466910091	1984-04-26	49248934106	bmaciejewskiv@netscape.com
+33	Sarita Avraam	35721203060	2001-10-07	48289638461	savraamw@desdev.cn
+34	Mureil Hackleton	41748450895	1990-07-12	49865918386	mhackletonx@bbc.co.uk
+35	Reed Drane	90208474104	1981-01-01	48788419076	rdraney@mayoclinic.com
+36	Astrix McLenaghan	74215934999	1988-01-26	49569519238	amclenaghanz@istockphoto.com
+37	Cordell Cordey	52936486891	1983-03-10	49198782085	ccordey10@whitehouse.gov
+38	Teddie Udale	27217526749	1988-05-16	49034689786	tudale11@reddit.com
+39	Janine Freezor	19318268177	1999-10-05	48626301318	jfreezor12@pinterest.com
+40	Henderson Yoakley	25850163668	1994-04-23	49018424984	hyoakley13@networksolutions.com
+41	Angel Vernall	31540070434	2001-09-19	49086445068	avernall14@smh.com.au
+42	Merilee Ginnelly	14329108138	1998-03-15	49552558299	mginnelly15@tiny.cc
+43	Drusie Studeart	99502905735	2001-02-03	49854657393	dstudeart16@toplist.cz
+44	Tedie Bloor	47582489709	1983-07-20	49416864234	tbloor17@prweb.com
+45	Saundra Cockton	24378660737	1994-02-06	49048825910	scockton18@hugedomains.com
+46	Noni Jennens	78406503615	1999-05-14	48953197474	njennens19@nsw.gov.au
+47	Gasper Mathew	44305873875	1986-03-09	48733336314	gmathew1a@bravesites.com
+48	Merrick Mille	48606699349	1999-12-14	49363061894	mmille1b@netvibes.com
+49	Katina Linning	58965890841	1985-08-06	49552867025	klinning1c@narod.ru
+50	Stanly Woodes	46831703529	1997-12-12	49522831237	swoodes1d@g.co
+3	Efren Skeggses	12415445348	1995-06-01	48957810045	jpauletto2@mozilla.org
+54	Teste	123	1993-08-18	\N	teste
+\.
+
+
+--
+-- Data for Name: membro_motocicleta; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.membro_motocicleta (membro_fk, motocicleta_fk) FROM stdin;
+1	1
+2	2
+4	4
+5	5
+6	6
+7	7
+8	8
+9	9
+10	10
+11	11
+12	12
+13	13
+14	14
+15	15
+16	16
+17	17
+18	18
+19	19
+20	20
+21	21
+22	22
+24	24
+25	25
+26	26
+27	27
+28	28
+29	29
+30	30
+31	31
+32	32
+33	33
+34	34
+35	35
+36	36
+37	37
+38	38
+39	39
+40	40
+42	42
+43	43
+44	44
+45	45
+46	46
+47	47
+48	48
+49	49
+50	50
+1	51
+2	52
+4	54
+5	55
+6	56
+7	57
+8	58
+9	59
+10	60
+11	61
+12	62
+13	63
+14	64
+15	65
+16	66
+17	67
+18	68
+19	69
+20	70
+\.
+
+
+--
+-- Data for Name: mensalidade; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.mensalidade (mensalidade_pk, data, valor, vencimento) FROM stdin;
+1	2022-09-10	40	2022-10-10
+2	2022-10-10	40	2022-11-10
+3	2022-11-10	40	2022-12-10
+4	2022-12-10	50	2023-01-10
+5	2023-01-10	50	2023-02-10
+\.
+
+
+--
+-- Data for Name: motocicleta; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.motocicleta (motocicleta_pk, marca, modelo, ano, cilindrada, cor, final_placa) FROM stdin;
+1	Kawasaki	Ninja 650	1999	650	Azul	14
+2	Kawasaki	Ninja 400	1986	400	Branco	71
+3	Kawasaki	Ninja 650	2010	650	Prata	81
+4	Kawasaki	Ninja 650	2007	650	Branco	48
+5	Suzuki	Marauder	1998	800	Prata	46
+6	Honda	CB400	1989	400	Vermelho	49
+7	Honda	Shadow 650	2005	650	Azul	20
+8	Honda	Shadow 750	1995	750	Vermelho	17
+9	Yamaha	DragStar	2003	650	Preto	32
+10	Yamaha	DragStar	2002	650	Branco	94
+11	Yamaha	DragStar	1972	650	Branco	20
+12	Honda	CB400	1999	400	Branco	43
+13	Suzuki	Marauder	1992	800	Branco	63
+14	Yamaha	MidnightStar	2001	950	Preto	90
+15	Kawasaki	Ninja 400	2009	400	Prata	88
+16	Yamaha	MidnightStar	1991	950	Azul	67
+17	Yamaha	MidnightStar	1994	950	Vermelho	24
+18	Honda	Shadow 750	2001	750	Azul	89
+19	Suzuki	Intruder	2009	250	Branco	93
+20	Honda	Shadow 650	1997	650	Preto	93
+21	Kawasaki	Ninja 400	2003	400	Prata	38
+22	Yamaha	DragStar	2011	650	Branco	41
+23	Kawasaki	Ninja 400	2002	400	Preto	67
+24	Kawasaki	Ninja 400	2006	400	Prata	42
+25	Kawasaki	Ninja 650	2008	650	Vermelho	89
+26	Suzuki	Intruder	2009	250	Vermelho	95
+27	Kawasaki	Ninja 400	1997	400	Branco	50
+28	Yamaha	MidnightStar	2005	950	Vermelho	88
+29	Kawasaki	Ninja 400	1999	400	Branco	77
+30	Kawasaki	Ninja 650	1988	650	Azul	77
+31	Honda	Shadow 650	1993	650	Vermelho	92
+32	Kawasaki	Ninja 650	2004	650	Branco	47
+33	Kawasaki	Ninja 400	1989	400	Vermelho	63
+34	Kawasaki	Ninja 400	1994	400	Vermelho	90
+35	Kawasaki	Ninja 650	1993	650	Vermelho	10
+36	Honda	CB400	2003	400	Branco	10
+37	Honda	Shadow 750	2009	750	Preto	48
+38	Kawasaki	Ninja 650	1992	650	Azul	71
+39	Suzuki	Intruder	2011	250	Branco	95
+40	Yamaha	MidnightStar	2005	950	Prata	52
+41	Kawasaki	Ninja 400	2003	400	Prata	74
+42	Honda	Shadow 750	1986	750	Vermelho	10
+43	Yamaha	DragStar	1993	650	Vermelho	95
+44	Kawasaki	Ninja 650	2008	650	Vermelho	30
+45	Suzuki	Marauder	2000	800	Azul	14
+46	Honda	CB400	1998	400	Prata	38
+47	Kawasaki	Ninja 650	1999	650	Preto	58
+48	Kawasaki	Ninja 400	2010	400	Preto	63
+49	Kawasaki	Ninja 650	2009	650	Azul	58
+50	Suzuki	Marauder	2008	800	Prata	81
+51	Kawasaki	Ninja 650	2005	650	Vermelho	29
+52	Kawasaki	Ninja 400	2003	400	Preto	31
+53	Kawasaki	Ninja 400	2000	400	Prata	20
+54	Yamaha	MidnightStar	2010	950	Preto	86
+55	Kawasaki	Ninja 400	2012	400	Prata	25
+56	Suzuki	Intruder	2002	250	Vermelho	30
+57	Kawasaki	Ninja 400	2004	400	Prata	37
+58	Kawasaki	Ninja 650	1988	650	Preto	78
+59	Honda	CB400	2004	400	Azul	95
+60	Yamaha	DragStar	1996	650	Vermelho	92
+61	Honda	Shadow 750	1997	750	Preto	77
+62	Honda	CB400	2000	400	Azul	19
+63	Kawasaki	Ninja 650	1998	650	Vermelho	29
+64	Honda	Shadow 650	1995	650	Prata	12
+65	Yamaha	MidnightStar	2006	950	Azul	72
+66	Honda	CB400	1986	400	Azul	50
+67	Kawasaki	Ninja 650	1985	650	Azul	81
+68	Honda	Shadow 650	2001	650	Preto	69
+69	Honda	CB400	2005	400	Branco	97
+70	Honda	CB400	2000	400	Branco	74
+\.
+
+
+--
+-- Data for Name: pagamento_mensalidade; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.pagamento_mensalidade (membro_fk, mensalidade_fk, pago) FROM stdin;
+1	1	t
+1	2	t
+1	3	t
+1	4	f
+2	1	f
+2	2	f
+2	3	f
+2	4	f
+2	5	f
+3	1	t
+3	2	t
+3	3	f
+3	4	f
+3	5	t
+4	1	f
+4	2	t
+4	3	f
+4	4	f
+4	5	t
+5	1	t
+5	2	t
+5	3	f
+5	4	f
+5	5	t
+6	1	t
+6	2	f
+6	3	f
+6	4	f
+6	5	f
+7	1	t
+7	2	f
+7	3	f
+7	4	t
+7	5	f
+8	1	t
+8	2	f
+8	3	f
+8	4	f
+8	5	f
+9	1	t
+9	2	f
+9	3	t
+9	4	t
+9	5	t
+10	1	t
+10	2	t
+10	3	f
+10	4	f
+10	5	f
+11	1	f
+11	2	t
+11	3	f
+11	4	t
+11	5	t
+12	1	t
+12	2	f
+12	3	f
+12	4	f
+12	5	f
+13	1	f
+13	2	t
+13	3	t
+13	4	f
+13	5	t
+14	1	f
+14	2	f
+14	3	f
+14	4	f
+14	5	t
+15	1	f
+15	2	t
+15	3	f
+15	4	t
+15	5	t
+16	1	t
+16	2	f
+16	3	f
+16	4	t
+16	5	t
+17	1	t
+17	2	f
+17	3	t
+17	4	t
+17	5	t
+18	1	f
+18	2	f
+18	3	t
+18	4	f
+18	5	t
+19	1	f
+19	2	t
+19	3	f
+19	4	f
+19	5	f
+20	1	t
+20	2	t
+20	3	t
+20	4	t
+20	5	f
+21	1	f
+21	2	t
+21	3	t
+21	4	t
+21	5	t
+22	1	t
+22	2	t
+22	3	t
+22	4	f
+22	5	f
+23	1	f
+23	2	f
+23	3	f
+23	4	t
+23	5	t
+24	1	t
+24	2	t
+24	3	t
+24	4	t
+24	5	t
+25	1	t
+25	2	f
+25	3	t
+25	4	t
+25	5	f
+26	1	t
+26	2	t
+26	3	f
+26	4	t
+26	5	t
+27	1	t
+27	2	t
+27	3	t
+27	4	t
+27	5	t
+28	1	t
+28	2	f
+28	3	t
+28	4	f
+28	5	f
+29	1	t
+29	2	f
+29	3	f
+29	4	t
+29	5	f
+30	1	f
+30	2	f
+30	3	t
+30	4	f
+30	5	f
+31	1	t
+31	2	t
+31	3	t
+31	4	f
+31	5	t
+32	1	t
+32	2	t
+32	3	f
+32	4	f
+32	5	t
+33	1	t
+33	2	t
+33	3	f
+33	4	f
+33	5	f
+34	1	f
+34	2	t
+34	3	f
+34	4	t
+34	5	f
+35	1	t
+35	2	f
+35	3	f
+35	4	t
+35	5	t
+36	1	t
+36	2	f
+36	3	t
+36	4	f
+36	5	f
+37	1	f
+37	2	f
+37	3	t
+37	4	t
+37	5	t
+38	1	f
+38	2	f
+38	3	f
+38	4	f
+38	5	t
+39	1	t
+39	2	f
+39	3	t
+39	4	f
+39	5	t
+40	1	f
+40	2	t
+40	3	t
+40	4	t
+40	5	t
+41	1	f
+41	2	t
+41	3	t
+41	4	f
+41	5	f
+42	1	t
+42	2	t
+42	3	t
+42	4	f
+42	5	f
+43	1	f
+43	2	t
+43	3	f
+43	4	f
+43	5	f
+44	1	f
+44	2	t
+44	3	f
+44	4	t
+44	5	f
+45	1	t
+45	2	f
+45	3	t
+45	4	t
+45	5	t
+46	1	f
+46	2	t
+46	3	t
+46	4	t
+46	5	t
+47	1	f
+47	2	f
+47	3	t
+47	4	f
+47	5	f
+48	1	t
+48	2	f
+48	3	f
+48	4	t
+48	5	f
+49	1	t
+49	2	f
+49	3	t
+49	4	f
+49	5	t
+50	1	f
+50	2	t
+50	3	f
+50	5	t
+1	5	t
+50	4	t
+54	5	f
+\.
+
+
+--
+-- Data for Name: participacao_evento; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.participacao_evento (evento_fk, membro_fk, status) FROM stdin;
+1	2	2
+1	3	2
+1	4	2
+1	5	1
+1	6	3
+1	7	3
+1	8	2
+1	9	2
+1	10	2
+1	11	2
+1	12	1
+1	13	3
+1	14	2
+1	15	2
+1	16	2
+1	17	3
+1	18	3
+1	19	3
+1	20	2
+1	21	2
+1	22	2
+1	23	3
+1	24	1
+1	25	1
+1	26	3
+1	27	1
+1	28	2
+1	29	1
+1	30	2
+1	31	3
+1	32	2
+1	33	2
+1	34	2
+1	35	2
+1	36	3
+1	37	3
+1	38	1
+1	39	2
+1	40	3
+1	41	3
+1	42	1
+1	43	3
+1	44	1
+1	45	3
+1	46	1
+1	47	3
+1	48	1
+1	49	2
+1	50	3
+2	2	3
+2	3	3
+2	4	2
+2	5	2
+2	6	2
+2	7	2
+2	8	1
+2	9	2
+2	10	3
+2	11	1
+2	12	3
+2	13	3
+2	14	2
+2	15	2
+2	16	2
+2	17	1
+2	18	3
+2	19	3
+2	20	1
+2	21	2
+2	22	1
+2	23	1
+2	24	3
+2	25	1
+2	26	2
+2	27	1
+2	28	1
+2	29	3
+2	30	2
+2	31	2
+2	32	1
+2	33	3
+2	34	2
+2	35	1
+2	36	1
+2	37	1
+2	38	1
+2	39	3
+2	40	1
+2	41	1
+2	42	2
+2	43	2
+2	44	2
+2	45	3
+2	46	3
+2	47	2
+2	48	1
+2	49	1
+2	50	3
+3	2	1
+3	3	1
+3	4	1
+3	5	2
+3	6	3
+3	7	2
+3	8	1
+3	9	2
+3	10	2
+3	11	1
+3	12	2
+3	13	2
+3	14	1
+3	15	3
+3	16	3
+3	17	2
+3	18	3
+3	19	3
+3	20	2
+3	21	1
+3	22	3
+3	23	1
+3	24	2
+3	25	2
+3	26	3
+3	27	1
+3	28	1
+3	29	1
+3	30	2
+3	31	3
+3	32	2
+3	33	3
+3	34	1
+3	35	2
+3	36	1
+3	37	3
+3	38	1
+3	39	3
+3	40	3
+3	41	2
+3	42	3
+3	43	1
+3	44	1
+3	45	1
+3	46	2
+3	47	3
+3	48	1
+3	49	2
+3	50	2
+4	2	2
+4	3	1
+4	4	3
+4	5	3
+4	6	2
+4	7	2
+4	8	2
+4	9	2
+4	10	2
+4	11	3
+4	12	1
+4	13	1
+4	14	2
+4	15	3
+4	16	1
+4	17	1
+4	18	2
+4	19	1
+4	20	2
+4	21	3
+4	22	1
+4	23	1
+4	24	2
+4	25	1
+4	26	3
+4	27	1
+4	28	3
+4	29	2
+4	30	2
+4	31	2
+4	32	1
+4	33	1
+4	34	1
+4	1	2
+2	1	3
+3	1	3
+17	1	2
+4	35	2
+4	36	1
+4	37	2
+4	38	2
+4	39	3
+4	40	2
+4	41	2
+4	42	3
+4	43	1
+4	44	3
+4	45	1
+4	46	1
+4	47	3
+4	48	3
+4	49	1
+4	50	3
+5	2	2
+5	3	1
+5	4	1
+5	5	3
+5	6	2
+5	7	2
+5	8	2
+5	9	2
+5	10	2
+5	11	1
+5	12	1
+5	13	2
+5	14	3
+5	15	3
+5	16	2
+5	17	2
+5	18	2
+5	19	2
+5	20	3
+5	21	2
+5	22	2
+5	23	1
+5	24	3
+5	25	2
+5	26	2
+5	27	2
+5	28	3
+5	29	3
+5	30	2
+5	31	2
+5	32	3
+5	33	1
+5	34	2
+5	35	2
+5	36	2
+5	37	3
+5	38	2
+5	39	1
+5	40	2
+5	41	2
+5	42	1
+5	43	2
+5	44	3
+5	45	1
+5	46	3
+5	47	1
+5	48	2
+5	49	3
+5	50	1
+6	2	3
+6	3	1
+6	4	1
+6	5	1
+6	6	2
+6	7	3
+6	8	1
+6	9	1
+6	10	1
+6	11	3
+6	12	1
+6	13	1
+6	14	1
+6	15	2
+6	16	1
+6	17	1
+6	18	3
+6	19	3
+6	20	1
+6	21	3
+6	22	2
+6	23	1
+6	24	3
+6	25	3
+6	26	3
+6	27	1
+6	28	3
+6	29	1
+6	30	2
+6	31	2
+6	32	2
+6	33	2
+6	34	3
+6	35	3
+6	36	1
+6	37	3
+6	38	3
+6	39	1
+6	40	3
+6	41	2
+6	42	2
+6	43	1
+6	44	2
+6	45	3
+6	46	1
+6	47	1
+6	48	1
+6	49	2
+6	50	1
+7	1	3
+7	2	2
+7	3	1
+7	4	2
+7	5	1
+7	6	3
+7	7	3
+7	8	1
+7	9	2
+7	10	3
+7	11	1
+7	12	3
+7	13	1
+7	14	2
+7	15	3
+7	16	1
+7	17	3
+7	18	3
+7	19	2
+7	20	3
+7	21	1
+7	22	2
+7	23	3
+7	24	3
+7	25	1
+7	26	2
+7	27	2
+7	28	1
+7	29	1
+7	30	2
+7	31	1
+7	32	3
+7	33	3
+7	34	1
+7	35	1
+7	36	2
+7	37	3
+7	38	2
+7	39	1
+7	40	3
+7	41	2
+7	42	2
+7	43	3
+7	44	2
+7	45	1
+7	46	1
+7	47	2
+7	48	3
+7	49	1
+7	50	1
+8	2	3
+8	3	3
+8	4	2
+8	5	3
+8	6	2
+8	7	2
+8	8	3
+8	9	2
+8	10	3
+8	11	1
+8	12	1
+8	13	3
+8	14	2
+8	15	1
+8	16	1
+8	17	3
+8	18	1
+8	19	1
+6	1	3
+5	1	2
+8	20	3
+8	21	3
+8	22	3
+8	23	1
+8	24	2
+8	25	1
+8	26	2
+8	27	3
+8	28	2
+8	29	2
+8	30	1
+8	31	1
+8	32	3
+8	33	1
+8	34	3
+8	35	2
+8	36	3
+8	37	1
+8	38	2
+8	39	1
+8	40	3
+8	41	3
+8	42	1
+8	43	1
+8	44	3
+8	45	3
+8	46	1
+8	47	3
+8	48	3
+8	49	3
+8	50	2
+9	1	3
+9	2	1
+9	3	3
+9	4	2
+9	5	2
+9	6	1
+9	7	3
+9	8	1
+9	9	3
+9	10	1
+9	11	1
+9	12	3
+9	13	1
+9	14	3
+9	15	1
+9	16	3
+9	17	3
+9	18	3
+9	19	2
+9	20	3
+9	21	2
+9	22	2
+9	23	3
+9	24	3
+9	25	2
+9	26	2
+9	27	2
+9	28	1
+9	29	3
+9	30	3
+9	31	2
+9	32	2
+9	33	2
+9	34	1
+9	35	2
+9	36	3
+9	37	1
+9	38	2
+9	39	1
+9	40	2
+9	41	1
+9	42	3
+9	43	3
+9	44	2
+9	45	1
+9	46	3
+9	47	2
+9	48	2
+9	49	2
+9	50	1
+10	1	2
+10	2	1
+10	3	2
+10	4	2
+10	5	1
+10	6	1
+10	7	1
+10	8	2
+10	9	1
+10	10	2
+10	11	1
+10	12	1
+10	13	1
+10	14	2
+10	15	3
+10	16	1
+10	17	3
+10	18	3
+10	19	2
+10	20	3
+10	21	2
+10	22	1
+10	23	3
+10	24	1
+10	25	1
+10	26	1
+10	27	2
+10	28	2
+10	29	2
+10	30	3
+10	31	2
+10	32	3
+10	33	1
+10	34	2
+10	35	2
+10	36	2
+10	37	2
+10	38	2
+10	39	1
+10	40	3
+10	41	2
+10	42	3
+10	43	1
+10	44	1
+10	45	2
+10	46	2
+10	47	1
+10	48	1
+10	49	1
+10	50	2
+11	1	3
+11	2	2
+11	3	1
+11	4	2
+11	5	3
+11	6	3
+11	7	2
+11	8	3
+11	9	1
+11	10	3
+11	11	1
+11	12	3
+11	13	3
+11	14	2
+11	15	2
+11	16	2
+11	17	1
+11	18	2
+11	19	2
+11	20	2
+11	21	1
+11	22	3
+11	23	2
+11	24	2
+11	25	2
+11	26	1
+11	27	1
+11	28	2
+11	29	2
+11	30	1
+11	31	1
+11	32	1
+11	33	2
+11	34	1
+11	35	3
+11	36	1
+11	37	3
+11	38	1
+11	39	2
+11	40	2
+11	41	3
+11	42	1
+11	43	2
+11	44	1
+11	45	2
+11	46	2
+11	47	3
+11	48	3
+11	49	3
+11	50	3
+12	2	1
+12	3	3
+12	4	1
+12	5	1
+12	6	1
+12	7	1
+12	8	3
+12	9	1
+12	10	1
+12	11	3
+12	12	1
+12	13	3
+12	14	2
+12	15	2
+12	16	1
+12	17	3
+12	18	3
+12	19	2
+12	20	2
+12	21	1
+12	22	3
+12	23	2
+12	24	2
+12	25	1
+12	26	1
+12	27	3
+12	28	2
+12	29	1
+12	30	2
+12	31	1
+12	32	2
+12	33	3
+12	34	1
+12	35	2
+12	36	3
+12	37	1
+12	38	3
+12	39	3
+12	40	3
+12	41	1
+12	42	3
+12	43	1
+12	44	1
+12	45	3
+12	46	3
+12	47	2
+12	48	1
+12	49	2
+12	50	3
+13	2	3
+13	3	3
+13	4	1
+13	5	1
+13	6	2
+13	7	3
+13	8	3
+13	9	3
+13	10	1
+13	11	1
+13	12	1
+13	13	1
+13	14	3
+13	15	1
+13	16	3
+13	17	2
+13	18	2
+13	19	3
+13	20	3
+13	21	2
+13	22	3
+13	23	3
+13	24	1
+13	25	2
+13	26	3
+13	27	3
+13	28	3
+13	29	3
+13	30	2
+13	31	1
+13	32	3
+13	33	1
+13	34	1
+13	35	2
+13	36	1
+13	37	2
+13	38	2
+13	39	3
+13	40	2
+13	41	1
+13	42	2
+13	43	1
+13	44	2
+13	45	3
+13	46	3
+13	47	2
+13	48	3
+13	49	3
+13	50	2
+14	2	2
+14	3	1
+14	4	2
+14	5	3
+14	6	3
+14	7	2
+14	8	1
+14	9	2
+14	10	2
+14	11	3
+14	12	3
+14	13	3
+14	14	3
+14	15	3
+14	16	3
+14	17	1
+14	18	3
+14	19	1
+14	20	3
+14	21	1
+14	22	1
+14	23	3
+14	24	3
+14	25	1
+14	26	1
+14	27	1
+14	28	2
+14	29	1
+14	30	1
+14	31	1
+14	32	3
+14	33	2
+14	34	1
+14	35	2
+14	36	2
+14	37	2
+14	38	2
+14	39	2
+14	40	3
+14	41	3
+14	42	3
+14	43	2
+14	44	2
+14	45	1
+14	46	3
+14	47	1
+14	48	3
+14	49	1
+14	50	2
+15	2	3
+15	3	1
+15	4	1
+15	5	3
+15	6	1
+15	7	1
+15	8	2
+15	9	2
+15	10	3
+15	11	3
+15	12	3
+15	13	1
+15	14	2
+15	15	1
+15	16	2
+15	17	2
+15	18	2
+15	19	2
+15	20	1
+15	21	3
+15	22	3
+15	23	2
+15	24	1
+15	25	1
+15	26	1
+15	27	3
+15	28	2
+15	29	2
+15	30	1
+15	31	2
+15	32	2
+15	33	2
+15	34	1
+15	35	2
+15	36	3
+15	37	1
+15	38	2
+15	39	1
+15	40	1
+15	41	1
+15	42	1
+15	43	3
+15	44	3
+15	45	1
+15	46	3
+15	47	2
+15	48	3
+15	49	1
+15	50	1
+16	1	2
+16	2	1
+16	3	3
+16	4	3
+16	5	2
+16	6	3
+16	7	1
+16	8	2
+16	9	3
+16	10	2
+16	11	1
+16	12	2
+16	13	1
+16	14	1
+16	15	3
+16	16	3
+16	17	1
+17	2	1
+17	3	2
+17	4	1
+17	5	3
+17	6	1
+17	7	1
+17	8	2
+17	9	3
+17	10	2
+17	11	3
+17	12	2
+17	13	2
+17	14	3
+17	15	2
+17	16	2
+17	17	1
+17	18	2
+17	19	1
+17	20	3
+17	21	1
+17	22	3
+17	23	1
+17	24	3
+17	25	2
+17	26	1
+17	27	3
+17	28	2
+17	29	2
+17	30	1
+17	31	3
+17	32	2
+17	33	2
+17	34	2
+17	35	1
+17	36	1
+17	37	1
+17	38	2
+17	39	1
+17	40	1
+17	41	3
+17	42	1
+17	43	3
+17	44	2
+17	45	3
+17	46	1
+17	47	1
+17	48	3
+17	49	3
+17	50	2
+18	2	2
+18	3	1
+18	4	1
+18	5	3
+18	6	3
+18	7	1
+18	8	1
+18	9	1
+18	10	1
+18	11	1
+18	12	3
+18	13	1
+18	14	3
+18	15	2
+18	16	3
+18	17	2
+18	18	1
+18	19	1
+18	20	1
+18	21	1
+18	22	1
+18	23	1
+18	24	3
+18	25	2
+18	26	3
+18	27	3
+18	28	2
+18	29	1
+18	30	1
+18	31	3
+18	32	2
+18	33	2
+18	34	2
+18	35	2
+18	36	3
+18	37	3
+18	38	2
+18	39	1
+18	40	2
+18	41	3
+18	42	3
+18	43	2
+18	44	1
+18	45	1
+18	46	1
+18	47	2
+18	48	1
+18	49	2
+18	50	3
+19	2	1
+19	3	2
+19	4	3
+19	5	3
+19	6	2
+19	7	1
+19	8	1
+19	9	2
+19	10	1
+19	11	3
+19	12	1
+19	13	3
+19	14	3
+19	15	2
+19	16	2
+19	17	3
+19	18	1
+19	19	1
+19	20	3
+19	21	1
+19	22	2
+19	23	3
+19	24	1
+19	25	3
+19	26	1
+19	27	1
+19	28	1
+19	29	2
+19	30	1
+19	31	1
+19	32	1
+19	33	2
+19	34	1
+19	35	1
+19	36	2
+19	37	1
+19	38	3
+19	39	1
+19	40	3
+19	41	3
+19	42	2
+19	43	1
+19	44	3
+19	45	1
+19	46	1
+19	47	3
+19	48	3
+19	49	2
+19	50	1
+20	1	2
+20	2	3
+20	3	2
+20	4	3
+20	5	1
+20	6	1
+20	7	2
+20	8	3
+19	1	3
+20	9	1
+20	10	1
+20	11	2
+20	12	3
+20	13	2
+20	14	2
+20	15	1
+20	16	3
+20	17	2
+20	18	3
+20	19	3
+20	20	2
+20	21	3
+20	22	1
+20	23	3
+20	24	1
+20	25	2
+20	26	2
+20	27	3
+20	28	3
+20	29	3
+20	30	2
+20	31	1
+20	32	3
+20	33	3
+20	34	1
+20	35	2
+20	36	1
+20	37	1
+20	38	2
+20	39	2
+20	40	1
+20	41	3
+20	42	2
+20	43	3
+20	44	1
+20	45	2
+20	46	1
+20	47	2
+20	48	2
+20	49	3
+20	50	2
+21	1	3
+21	2	2
+21	3	3
+21	4	3
+21	5	2
+21	6	3
+21	7	2
+21	8	3
+21	9	3
+21	10	3
+21	11	3
+21	12	2
+21	13	3
+21	14	2
+21	15	3
+21	16	3
+21	17	2
+21	18	1
+21	19	2
+21	20	1
+21	21	2
+21	22	2
+21	23	1
+21	24	3
+21	25	1
+21	26	3
+21	27	3
+21	28	3
+21	29	3
+21	30	2
+21	31	2
+21	32	1
+21	33	2
+21	34	1
+21	35	3
+21	36	2
+21	37	2
+21	38	3
+21	39	2
+21	40	2
+21	41	3
+21	42	1
+21	43	1
+21	44	1
+21	45	1
+21	46	3
+21	47	2
+21	48	2
+21	49	1
+21	50	3
+22	2	3
+22	3	3
+22	4	1
+22	5	1
+22	6	2
+22	7	3
+22	8	2
+22	9	3
+22	10	3
+22	11	1
+22	12	1
+22	13	1
+22	14	2
+22	15	1
+22	16	1
+22	17	2
+22	18	3
+22	19	3
+22	20	3
+22	21	3
+22	22	3
+22	23	2
+22	24	3
+22	25	1
+22	26	1
+22	27	2
+22	28	3
+22	29	1
+22	30	1
+22	31	3
+22	32	3
+22	33	3
+22	34	3
+22	35	1
+22	36	3
+22	37	3
+22	38	2
+22	39	1
+22	40	3
+22	41	3
+22	42	3
+22	43	3
+22	44	3
+22	45	3
+22	46	1
+22	47	1
+22	48	3
+22	49	3
+22	50	1
+23	2	1
+23	3	3
+23	4	1
+23	5	3
+23	6	3
+23	7	3
+23	8	3
+23	9	3
+23	10	2
+23	11	3
+23	12	2
+23	13	3
+23	14	3
+23	15	2
+23	16	3
+23	17	3
+23	18	1
+23	19	1
+23	20	1
+23	21	3
+23	22	1
+23	23	2
+23	24	1
+23	25	1
+23	26	1
+23	27	1
+23	28	2
+23	29	2
+23	30	1
+23	31	3
+23	32	2
+23	33	2
+23	34	3
+23	35	3
+23	36	1
+23	37	3
+23	38	2
+23	39	2
+23	40	2
+23	41	1
+23	42	2
+23	43	3
+22	1	2
+23	44	1
+23	45	1
+23	46	1
+23	47	2
+23	48	2
+23	49	3
+23	50	1
+24	2	2
+24	3	3
+24	4	3
+24	5	1
+24	6	2
+24	7	2
+24	8	1
+24	9	2
+24	10	1
+24	11	2
+24	12	2
+24	13	3
+24	14	1
+24	15	1
+24	16	1
+24	17	2
+24	18	1
+24	19	2
+24	20	2
+24	21	3
+24	22	2
+24	23	2
+24	24	1
+24	25	3
+24	26	2
+24	27	1
+24	28	3
+24	29	1
+24	30	1
+24	31	2
+24	32	2
+24	33	2
+24	34	1
+24	35	2
+24	36	3
+24	37	3
+24	38	3
+24	39	3
+24	40	1
+24	41	1
+24	42	1
+24	43	2
+24	44	3
+24	45	3
+24	46	2
+24	47	1
+24	48	2
+24	49	3
+24	50	2
+25	2	1
+25	3	3
+25	4	3
+25	5	2
+25	6	2
+25	7	1
+25	8	2
+25	9	1
+25	10	2
+25	11	1
+25	12	3
+25	13	2
+25	14	3
+25	15	1
+25	16	2
+25	17	2
+25	18	2
+25	19	3
+25	20	2
+25	21	3
+25	22	2
+25	23	1
+25	24	2
+25	25	3
+25	26	2
+25	27	2
+25	28	2
+25	29	1
+25	30	1
+25	31	1
+25	32	1
+25	33	1
+25	34	3
+25	35	1
+25	36	2
+25	37	2
+25	38	3
+25	39	2
+25	40	3
+25	41	3
+25	42	2
+25	43	1
+25	44	1
+25	45	2
+25	46	3
+25	47	3
+25	48	3
+25	49	1
+25	50	1
+26	2	3
+26	3	3
+26	4	2
+26	5	3
+26	6	3
+26	7	3
+26	8	1
+26	9	2
+26	10	3
+26	11	2
+26	12	2
+26	13	1
+26	14	2
+26	15	3
+26	16	1
+26	17	1
+26	18	1
+26	19	3
+26	20	3
+26	21	2
+26	22	1
+26	23	2
+26	24	1
+26	25	1
+26	26	1
+26	27	3
+26	28	3
+26	29	1
+26	30	3
+26	31	3
+26	32	2
+26	33	2
+26	34	2
+26	35	3
+26	36	1
+26	37	2
+26	38	2
+26	39	3
+26	40	1
+26	41	3
+26	42	2
+26	43	1
+26	44	3
+26	45	1
+26	46	1
+26	47	2
+26	48	2
+26	49	2
+26	50	3
+27	2	2
+27	3	1
+27	4	3
+27	5	2
+27	6	1
+27	7	3
+27	8	2
+27	9	2
+27	10	1
+27	11	2
+24	1	2
+23	1	2
+18	1	3
+8	1	3
+12	1	3
+26	1	2
+25	1	2
+\.
+
+
+--
+-- Name: clube_clube_pk_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.clube_clube_pk_seq', 3, true);
+
+
+--
+-- Name: clube_evento_clube_fk_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.clube_evento_clube_fk_seq', 1, false);
+
+
+--
+-- Name: clube_evento_evento_fk_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.clube_evento_evento_fk_seq', 1, false);
+
+
+--
+-- Name: evento_evento_pk_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.evento_evento_pk_seq', 30, true);
+
+
+--
+-- Name: membro_membro_pk_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.membro_membro_pk_seq', 54, true);
+
+
+--
+-- Name: mensalidade_mensalidade_pk_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.mensalidade_mensalidade_pk_seq', 5, true);
+
+
+--
+-- Name: motocicleta_motocicleta_pk_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.motocicleta_motocicleta_pk_seq', 70, true);
+
+
+--
+-- Name: participacao_evento_evento_fk_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.participacao_evento_evento_fk_seq', 1, false);
+
+
+--
+-- Name: participacao_evento_membro_fk_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.participacao_evento_membro_fk_seq', 1, false);
+
+
+--
+-- Name: clube_evento clube_evento_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.clube_evento
+    ADD CONSTRAINT clube_evento_pkey PRIMARY KEY (clube_fk, evento_fk);
+
+
+--
+-- Name: clube_membro clube_membro_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.clube_membro
+    ADD CONSTRAINT clube_membro_pkey PRIMARY KEY (clube_fk, membro_fk);
+
+
+--
+-- Name: clube clube_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.clube
+    ADD CONSTRAINT clube_pkey PRIMARY KEY (clube_pk);
+
+
+--
+-- Name: evento evento_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.evento
+    ADD CONSTRAINT evento_pkey PRIMARY KEY (evento_pk);
+
+
+--
+-- Name: membro_motocicleta membro_motocicleta_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.membro_motocicleta
+    ADD CONSTRAINT membro_motocicleta_pkey PRIMARY KEY (motocicleta_fk, membro_fk);
+
+
+--
+-- Name: membro membro_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.membro
+    ADD CONSTRAINT membro_pkey PRIMARY KEY (membro_pk);
+
+
+--
+-- Name: mensalidade mensalidade_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.mensalidade
+    ADD CONSTRAINT mensalidade_pkey PRIMARY KEY (mensalidade_pk);
+
+
+--
+-- Name: motocicleta motocicleta_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.motocicleta
+    ADD CONSTRAINT motocicleta_pkey PRIMARY KEY (motocicleta_pk);
+
+
+--
+-- Name: pagamento_mensalidade pagamento_mensalidade_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pagamento_mensalidade
+    ADD CONSTRAINT pagamento_mensalidade_pkey PRIMARY KEY (mensalidade_fk, membro_fk);
+
+
+--
+-- Name: participacao_evento participacao_evento_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.participacao_evento
+    ADD CONSTRAINT participacao_evento_pkey PRIMARY KEY (evento_fk, membro_fk);
+
+
+--
+-- Name: membrosmenospagadores _RETURN; Type: RULE; Schema: public; Owner: postgres
+--
+
+CREATE OR REPLACE VIEW public.membrosmenospagadores AS
+ SELECT m.membro_pk,
+    m.nome,
+    sum(mn.valor) AS total
+   FROM ((public.pagamento_mensalidade pm
+     JOIN public.membro m ON ((m.membro_pk = pm.membro_fk)))
+     JOIN public.mensalidade mn ON ((mn.mensalidade_pk = pm.mensalidade_fk)))
+  WHERE pm.pago
+  GROUP BY m.membro_pk
+  ORDER BY (sum(mn.valor));
+
+
+--
+-- Name: membro addmensalidade; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER addmensalidade AFTER INSERT ON public.membro FOR EACH ROW EXECUTE FUNCTION public.registramembro();
+
+
+--
+-- Name: clube_evento clube_evento_clube_fk_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.clube_evento
+    ADD CONSTRAINT clube_evento_clube_fk_fkey FOREIGN KEY (clube_fk) REFERENCES public.clube(clube_pk);
+
+
+--
+-- Name: clube_evento clube_evento_evento_fk_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.clube_evento
+    ADD CONSTRAINT clube_evento_evento_fk_fkey FOREIGN KEY (evento_fk) REFERENCES public.evento(evento_pk);
+
+
+--
+-- Name: clube_membro clube_membro_clube_fk_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.clube_membro
+    ADD CONSTRAINT clube_membro_clube_fk_fkey FOREIGN KEY (clube_fk) REFERENCES public.clube(clube_pk);
+
+
+--
+-- Name: clube_membro clube_membro_membro_fk_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.clube_membro
+    ADD CONSTRAINT clube_membro_membro_fk_fkey FOREIGN KEY (membro_fk) REFERENCES public.membro(membro_pk);
+
+
+--
+-- Name: membro_motocicleta membro_motocicleta_membro_fk_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.membro_motocicleta
+    ADD CONSTRAINT membro_motocicleta_membro_fk_fkey FOREIGN KEY (membro_fk) REFERENCES public.membro(membro_pk);
+
+
+--
+-- Name: membro_motocicleta membro_motocicleta_motocicleta_fk_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.membro_motocicleta
+    ADD CONSTRAINT membro_motocicleta_motocicleta_fk_fkey FOREIGN KEY (motocicleta_fk) REFERENCES public.motocicleta(motocicleta_pk);
+
+
+--
+-- Name: pagamento_mensalidade pagamento_mensalidade_membro_fk_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pagamento_mensalidade
+    ADD CONSTRAINT pagamento_mensalidade_membro_fk_fkey FOREIGN KEY (membro_fk) REFERENCES public.membro(membro_pk);
+
+
+--
+-- Name: pagamento_mensalidade pagamento_mensalidade_mensalidade_fk_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pagamento_mensalidade
+    ADD CONSTRAINT pagamento_mensalidade_mensalidade_fk_fkey FOREIGN KEY (mensalidade_fk) REFERENCES public.mensalidade(mensalidade_pk);
+
+
+--
+-- Name: participacao_evento participacao_evento_evento_fk_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.participacao_evento
+    ADD CONSTRAINT participacao_evento_evento_fk_fkey FOREIGN KEY (evento_fk) REFERENCES public.evento(evento_pk);
+
+
+--
+-- Name: participacao_evento participacao_evento_membro_fk_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.participacao_evento
+    ADD CONSTRAINT participacao_evento_membro_fk_fkey FOREIGN KEY (membro_fk) REFERENCES public.membro(membro_pk);
+
+
+--
+-- PostgreSQL database dump complete
+--
+
